@@ -1,7 +1,10 @@
 # Azure-Lab-Monitoring-Splunk
 
 ## Project Overview
-This repository contains a logging and monitoring solution for QUT's Azure Labs Services, developed using Splunk for data visualization. The project aims to provide dashboards and alerts that track security, system health, and performance metrics for virtual machines in Azure Lab Services. 
+This repository contains a logging and monitoring solution for Azure Labs Services, developed using Splunk for data visualization. The project aims to provide dashboards and alerts that track security, system health, and performance metrics for virtual machines in Azure Lab Services. 
+
+## DISCLAIMER
+The purpose of this repository is to document my own contributions to this project. I worked collaboratively on this project with one other developer. The files inside this repo were developed solely by myself, with the exception of the Alerts, which was a joint effort. There is no sensitive information contained in this repo in relation to the company or individuals involved.   
 
 ## Key Features
 - **Data Ingestion**: Uses in-house developed Universal Forwarders to collect logs (Sysmon, CPU, Memory, Disk, Network) from Azure Labs.
