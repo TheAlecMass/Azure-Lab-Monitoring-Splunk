@@ -1,0 +1,17 @@
+index=service_azure_labs
+source = "*"
+sourcetype = "mscs:storage:blob"
+| spath path="value{}" output=values
+| mvexpand values
+| spath input=values path="properties.state" output=state
+| spath input=values path="properties.connectionProfile.privateIpAddress" output=ip
+| spath input=values path="properties.vmType" output=VmType
+| eval running_count=if(state="Running", 1, 0)
+| stats sum(running_count) as IP_RunningTotal by source, ip, VmType
+| eval RunningVMs = if(IP_RunningTotal > 0, 1, null())
+| stats sum(IP_RunningTotal) as TotalRunning, count(eval(RunningVMs=1)) as VMsStarted, dc(ip) as TotalVMs by source
+| eval TotalHours = TotalRunning * 5 / 60
+| eval Hours = floor(TotalHours)
+| eval Minutes = round((TotalHours - Hours) * 60)
+| table source, TotalVMs, VMsStarted, Hours, Minutes
+| sort source

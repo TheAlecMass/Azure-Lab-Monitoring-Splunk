@@ -1,0 +1,24 @@
+index="service_azure_labs" sourcetype="mscs:storage:blob:json" source="win-logs-Network_*" OR source="network_tp.log_*"
+| rex "priv_ip_address=(?<priv_ip_address>\d+\.\d+\.\d+\.\d+)"
+| rex "bytestotalsec-Value=(?<WIN_bytestotalsec_Value>\d+\.\d+)?"
+| rex "bytessentsec-Value=(?<WIN_bytessentsec_Value>\d+\.\d+)?"
+| rex "bytesreceivedsec-Value=(?<WIN_bytesreceivedsec_Value>\d+\.\d+)?"
+| rex "rx\s+(?<LTS_rx_kbps>\d+\.\d+)\s+kbit/s"
+| rex "tx\s+(?<LTS_tx_kbps>\d+\.\d+)\s+kbit/s"
+| eval WIN_Kbps_total = if(isnotnull(WIN_bytestotalsec_Value), round(WIN_bytestotalsec_Value / 1024, 2), null())
+| eval WIN_Kbps_sent = if(isnotnull(WIN_bytessentsec_Value), round(WIN_bytessentsec_Value / 1024, 2), null())
+| eval WIN_Kbps_received = if(isnotnull(WIN_bytesreceivedsec_Value), round(WIN_bytesreceivedsec_Value / 1024, 2), null())
+| eval LTS_Kbps_total = round((if(isnotnull(LTS_rx_kbps), LTS_rx_kbps, 0) + if(isnotnull(LTS_tx_kbps), LTS_tx_kbps, 0)), 2)
+| eval LTS_Kbps_sent = if(isnotnull(LTS_tx_kbps), round(LTS_tx_kbps, 2), null())
+| eval LTS_Kbps_received = if(isnotnull(LTS_rx_kbps), round(LTS_rx_kbps, 2), null())
+| eval metric = case(
+    isnotnull(WIN_Kbps_total) AND WIN_Kbps_total > 10000, "Windows Network",
+    isnotnull(LTS_Kbps_total) AND LTS_Kbps_total > 10000, "Linux Network"
+  )
+| eval value = case(
+    isnotnull(WIN_Kbps_total) AND WIN_Kbps_total > 1, "Total: " + WIN_Kbps_total + " Kbp/s, Sent: " + WIN_Kbps_sent + " Kbp/s, Received: " + WIN_Kbps_received + " Kbp/s",
+    isnotnull(LTS_Kbps_total) AND LTS_Kbps_total > 1, "Total: " + LTS_Kbps_total + " Kbp/s, Sent: " + LTS_Kbps_sent + " Kbp/s, Received: " + LTS_Kbps_received + " Kbp/s"
+  )
+| where isnotnull(metric)
+| table _time, priv_ip_address, metric, value
+| eval _time=strftime(_time, "%Y-%m-%d %H:%M:%S")

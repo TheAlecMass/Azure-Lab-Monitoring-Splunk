@@ -1,0 +1,13 @@
+index="service_azure_labs" sourcetype="mscs:storage:blob:json" source="win-logs-Memory_*" OR source="mem_usage.log_*"
+| rex "priv_ip_address=(?<priv_ip_address>\d+\.\d+\.\d+\.\d+)"
+| rex "committedbytesinuse-Value=(?<committedbytesinuse>\d+)"
+| rex "mem_total=(?<mem_total>\d+)"
+| rex "mem_used=(?<mem_used>\d+)"
+| eval mem_used_percent = if(isnotnull(mem_used) AND isnotnull(mem_total), round((mem_used / mem_total) * 100, 2), null())
+| eval metric = case(
+    isnotnull(mem_used_percent) AND mem_used_percent > 98, "Memory % LTS",
+    isnotnull(committedbytesinuse) AND committedbytesinuse > 98, "Memory % WIN"
+  )
+| eval value = coalesce(mem_used_percent, committedbytesinuse)
+| where isnotnull(metric)
+| table _time, priv_ip_address, metric, value

@@ -1,0 +1,24 @@
+index=service_azure_labs earliest=0 sourcetype="mscs:storage:blob"
+| spath path="value{}" output=values
+| mvexpand values
+| spath input=values path="properties.state" output=state
+| spath input=values path="properties.connectionProfile.privateIpAddress" output=ip
+| spath input=values path="properties.vmType" output=VmType
+| eval running_count=if(state="Running", 1, 0)
+| stats sum(running_count) as TotalRunning by source, ip, VmType
+| eval TotalHours = TotalRunning * 5 / 60
+| eval RunningHours = floor(TotalHours)
+| eval RunningMinutes = round((TotalHours - RunningHours) * 60)
+| join type=inner source [
+    search index=service_azure_labs sourcetype="mscs:storage:blob"
+    | rex field=_raw "\"usageQuota\":\"(?<usageQuota>[^\"]+)\""
+    | rex field=_raw ",\"usageQuota\":\"P(?<usageQuotaDays>\d+)D\""
+    | rex field=_raw "(?<usageQuotaHours>\d+)H"
+    | eval TotalHourQuota = usageQuotaHours + (coalesce(usageQuotaDays, 0) * 24)
+    | table source, usageQuota, usageQuotaDays, usageQuotaHours, TotalHourQuota
+    | sort source
+]
+| eval RunningPercentage = (RunningHours / TotalHourQuota) * 100
+| where RunningPercentage >= 10 AND RunningPercentage <= 100
+| table source, ip, VmType, RunningHours, RunningMinutes, usageQuota, TotalHourQuota, RunningPercentage
+| sort source, ip

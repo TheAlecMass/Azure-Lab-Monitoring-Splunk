@@ -1,0 +1,23 @@
+index=service_azure_labs sourcetype="mscs:storage:blob:json" source="vm-logs:*"
+| spath path=properties.connectionProfile.privateIpAddress output=privateIpAddress
+| spath path=properties.state output=state
+| table state, privateIpAddress, source, _time
+| eval n=mvzip(state, privateIpAddress)
+| mvexpand n
+| rex field=n "(?<state>.+),(?<privateIpAddress>.+)"
+| table state, privateIpAddress, source, _time
+| search state="Stopped" OR state="Running"
+| eval state=if(state="Stopped", "Stopped", state)
+| stats latest(_time) as late_state_time by state, privateIpAddress
+| eventstats max(late_state_time) as late_state_time_max by privateIpAddress
+| eval is_normal=if(late_state_time_max>late_state_time AND state="Stopped", 1, 0)
+| where is_normal=1
+| rename late_state_time_max as running_time, late_state_time as start_time
+| eval runtime=running_time-start_time
+| eval rounded_runtime = round(runtime/300)*5
+| eval hours = floor(rounded_runtime / 60), minutes = rounded_runtime % 60
+| eval time_display = if(rounded_runtime > 0, hours + " hours " + minutes + " minutes", "0 hours 0 minutes")
+| eval start_time=strftime(start_time, "%Y-%m-%d %H:%M:%S UTC"), running_time=strftime(running_time, "%Y-%m-%d %H:%M:%S UTC")
+| where runtime < 4*60*60
+| table privateIpAddress, start_time, running_time, time_display
+| sort -rounded_runtime

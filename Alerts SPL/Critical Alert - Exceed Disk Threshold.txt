@@ -1,0 +1,15 @@
+index="service_azure_labs" sourcetype="mscs:storage:blob:json" source="win-logs-Disk_*" OR source="disk_usage.log_*"
+| rex "priv_ip_address=(?<priv_ip_address>\d+\.\d+\.\d+\.\d+)"
+| rex "freespace-c:-Value=(?<freespace_c_value>\d+\.\d+)?"
+| rex "disk_usage=(?<disk_usage>\d+)?"
+| rex "disk_total=(?<disk_total>\d+)?"
+| eval spaceused = if(isnotnull(freespace_c_value), 100 - freespace_c_value, null())
+| eval Percent_Disk_Used = if(isnotnull(disk_usage) AND isnotnull(disk_total), round((disk_usage / disk_total) * 100, 2), null())
+| eval metric = case(
+    isnotnull(spaceused) AND spaceused > 1500, "WIN % Disk Used C: Drive",
+    isnotnull(Percent_Disk_Used) AND Percent_Disk_Used > 1500, "LTS % Disk Used"
+  )
+| eval value = coalesce(spaceused, Percent_Disk_Used)
+| where isnotnull(metric)
+| table _time, priv_ip_address, metric, value
+| eval _time=strftime(_time, "%Y-%m-%d %H:%M:%S")
