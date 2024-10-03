@@ -1,0 +1,204 @@
+#!/bin/bash
+
+# Set up directories
+SCRIPTS_DIR="/opt/QUT-Log-Forwarder/Scripts"
+SCHEDULER_DIR="/opt/QUT-Log-Forwarder/Scheduler"
+
+mkdir -p "$SCRIPTS_DIR"
+mkdir -p "$SCHEDULER_DIR"
+
+# Ask for the Azure SAS token
+read -p "Enter Azure SAS token: " SAS_TOKEN
+
+# Create the append_ip_to_logs.sh script
+cat << 'EOF' > "$SCRIPTS_DIR/append_ip_to_logs.sh"
+#!/bin/bash
+
+PUB_IP_ADDRESS=$(curl -sL ipconfig.me/ip)
+PRIV_IP_ADDRESS=$(hostname -I | cut -d' ' -f1)
+
+function append_ip {
+    local log_file=$1
+    local log_with_ip="${log_file}.with_ip"
+
+    tail -F -n0 "$log_file" | while read -r line; do
+        echo "$line priv_ip_address=$PRIV_IP_ADDRESS pub_ip_address=$PUB_IP_ADDRESS" >> "$log_with_ip"
+    done
+}
+
+logs_to_monitor=(
+    "/var/log/syslog"
+    "/var/log/auth.log"
+    "/var/log/dpkg.log"
+    "/var/log/kern.log"
+    "/var/log/waagent.log"
+    "/var/log/cloud-init.log"
+)
+
+for log_file in "${logs_to_monitor[@]}"; do
+    append_ip "$log_file" &
+done
+
+wait
+EOF
+
+chmod +x "$SCRIPTS_DIR/append_ip_to_logs.sh"
+
+# Download and install AzCopy
+cd "$SCHEDULER_DIR"
+wget https://aka.ms/downloadazcopy-v10-linux -O azcopy.tar.gz
+tar -xzvf azcopy.tar.gz --strip-components=1 --wildcards */azcopy
+chmod +x azcopy
+rm azcopy.tar.gz
+
+# Create the upload_var_logs.sh script
+cat << EOF > "$SCHEDULER_DIR/upload_var_logs.sh"
+#!/bin/bash
+
+log_dir="/var/log"
+output_dir="/opt/QUT-Log-Forwarder/logs"
+ip_address=\$(hostname -I | awk '{print \$1}')
+azcopy_path="/opt/QUT-Log-Forwarder/Scheduler/azcopy"
+
+if [ ! -x "\$azcopy_path" ]; then
+    echo "Error: azcopy is not executable or not found at \$azcopy_path" | tee -a /opt/QUT-Log-Forwarder/error.log
+    exit 1
+fi
+
+declare -A log_files=(
+    [syslog]="\$log_dir/syslog.with_ip \$output_dir/syslog.log_\$ip_address"
+    [uptime]="\$log_dir/uptime.log \$output_dir/uptime.log_\$ip_address"
+    [auth]="\$log_dir/auth.log.with_ip \$output_dir/auth.log_\$ip_address"
+    [dpkg]="\$log_dir/dpkg.log.with_ip \$output_dir/dpkg.log_\$ip_address"
+    [kern]="\$log_dir/kern.log.with_ip \$output_dir/kern.log_\$ip_address"
+    [waagent]="\$log_dir/waagent.log.with_ip \$output_dir/waagent.log_\$ip_address"
+    [cloud_init]="\$log_dir/cloud-init.log.with_ip \$output_dir/cloud-init.log_\$ip_address"
+    [cpu]="\$log_dir/cpu_usage \$output_dir/cpu_usage.log_\$ip_address"
+    [network]="\$log_dir/network_tp \$output_dir/network_tp.log_\$ip_address"
+    [memory]="\$log_dir/mem_usage \$output_dir/mem_usage.log_\$ip_address"
+    [disk]="\$log_dir/disk_usage \$output_dir/disk_usage.log_\$ip_address"
+)
+
+log_data() {
+    local file_path=\$1
+    local output_path=\$2
+    if [[ "\$file_path" == *"network_tp"* ]]; then
+        rx_data=\$(grep "rx" "\$file_path" | tail -n 1)
+        tx_data=\$(grep "tx" "\$file_path" | tail -n 1)
+        echo "\$rx_data \$tx_data" > "\$output_path"
+    else
+        tail -n 1 "\$file_path" > "\$output_path"
+    fi
+}
+
+mkdir -p "\$output_dir"
+
+for key in "\${!log_files[@]}"; do
+    IFS=' ' read -r input_path output_path <<< "\${log_files[\$key]}"
+    log_data "\$input_path" "\$output_path"
+done
+
+echo "Latest logs written to individual files in \$output_dir"
+
+storageAccountUrl="$SAS_TOKEN"
+
+for key in "\${!log_files[@]}"; do
+    IFS=' ' read -r input_path output_path <<< "\${log_files[\$key]}"
+    echo "Uploading \$output_path to Azure Storage" | tee -a /opt/QUT-Log-Forwarder/upload_var_logs.log
+    \$azcopy_path copy "\$output_path" "\$storageAccountUrl" --from-to=LocalBlob --overwrite=true 2>> /opt/QUT-Log-Forwarder/error.log
+    if [ \$? -eq 0 ]; then
+        echo "Successfully uploaded \$output_path" | tee -a /opt/QUT-Log-Forwarder/upload_var_logs.log
+    else
+        echo "Failed to upload \$output_path" | tee -a /opt/QUT-Log-Forwarder/error.log
+    fi
+done
+
+echo "Logs uploaded to Azure Storage."
+EOF
+
+chmod +x "$SCHEDULER_DIR/upload_var_logs.sh"
+
+# Create additional scripts
+cat << 'EOF' > "$SCRIPTS_DIR/cpu_usage.sh"
+#!/bin/bash
+
+PUB_IP_ADDRESS=$(curl -sL ipconfig.me/ip)
+PRIV_IP_ADDRESS=$(hostname -I | cut -d' ' -f1)
+
+mpstat 1 1 | awk '/Average/ {print "cpu_usage=" 100 - $12}'
+echo "cpu_usage=$(mpstat 1 1 | awk '/Average/{print 100 - $12}') priv_ip_address=$PRIV_IP_ADDRESS pub_ip_address=$PUB_IP_ADDRESS" >> /var/log/cpu_usage
+EOF
+
+chmod +x "$SCRIPTS_DIR/cpu_usage.sh"
+
+cat << 'EOF' > "$SCRIPTS_DIR/disk_usage.sh"
+#!/bin/bash
+
+PUB_IP_ADDRESS=$(curl -sL ipconfig.me/ip)
+PRIV_IP_ADDRESS=$(hostname -I | cut -d' ' -f1)
+
+DISK_USAGE=$(df -m / | awk 'NR==2 {print $3}')
+DISK_FREE=$(df -m / | awk 'NR==2 {print $4}')
+DISK_TOTAL=$(df -m / | awk 'NR==2 {print $2}')
+DISK_PERCENT_FREE=$(df -h / | awk 'NR==2 {print $5}')
+
+echo "disk_usage=${DISK_USAGE} disk_free=${DISK_FREE} disk_total=${DISK_TOTAL} disk_percent_free=$DISK_PERCENT_FREE priv_ip_address=$PRIV_IP_ADDRESS pub_ip_address=$PUB_IP_ADDRESS" >> /var/log/disk_usage
+EOF
+
+chmod +x "$SCRIPTS_DIR/disk_usage.sh"
+
+cat << 'EOF' > "$SCRIPTS_DIR/mem_usage.sh"
+#!/bin/bash
+
+PUB_IP_ADDRESS=$(curl -sL ifconfig.me/ip)
+PRIV_IP_ADDRESS=$(hostname -I | cut -d' ' -f1)
+
+MEM_TOTAL=$(free -m | awk '/^Mem:/ {print $2}')
+MEM_USED=$(free -m | awk '/^Mem:/ {print $3}')
+MEM_FREE=$(free -m | awk '/^Mem:/ {print $4}')
+
+echo "mem_total=${MEM_TOTAL} mem_used=${MEM_USED} mem_free=${MEM_FREE} priv_ip_address=$PRIV_IP_ADDRESS pub_ip_address=$PUB_IP_ADDRESS" >> /var/log/mem_usage
+EOF
+
+chmod +x "$SCRIPTS_DIR/mem_usage.sh"
+
+cat << 'EOF' > "$SCRIPTS_DIR/network_tp.sh"
+#!/bin/bash
+
+PUB_IP_ADDRESS=$(curl -sL ipconfig.me/ip)
+PRIV_IP_ADDRESS=$(hostname -I | cut -d' ' -f1)
+
+vnstat_output=$(vnstat -tr 60)
+
+echo "$vnstat_output priv_ip_address=$PRIV_IP_ADDRESS pub_ip_address=$PUB_IP_ADDRESS" >> /var/log/network_tp
+EOF
+
+chmod +x "$SCRIPTS_DIR/network_tp.sh"
+
+cat << 'EOF' > "$SCRIPTS_DIR/uptime.sh"
+#!/bin/bash
+
+PUB_IP_ADDRESS=$(curl -sL ipconfig.me/ip)
+PRIV_IP_ADDRESS=$(hostname -I | cut -d' ' -f1)
+
+UPTIME=$(awk '{print $1}' /proc/uptime)
+
+echo "uptime=${UPTIME} priv_ip_address=$PRIV_IP_ADDRESS pub_ip_address=$PUB_IP_ADDRESS" >> /var/log/uptime.log
+EOF
+
+chmod +x "$SCRIPTS_DIR/uptime.sh"
+
+# Set up crontab for root user
+(crontab -l 2>/dev/null; echo "@reboot /bin/bash $SCHEDULER_DIR/upload_var_logs.sh > /opt/QUT-Log-Forwarder/upload_var_logs_reboot.log 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "*/5 * * * * /bin/bash $SCHEDULER_DIR/upload_var_logs.sh > /opt/QUT-Log-Forwarder/upload_var_logs.log 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "*/5 * * * * /bin/bash $SCRIPTS_DIR/uptime.sh >> /var/log/uptime.log 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "*/5 * * * * /bin/bash $SCRIPTS_DIR/cpu_usage.sh >> /var/log/cpu_usage 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "*/5 * * * * /bin/bash $SCRIPTS_DIR/mem_usage.sh >> /var/log/mem_usage 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "*/5 * * * * /bin/bash $SCRIPTS_DIR/network_tp.sh >> /var/log/network_tp 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "*/15 * * * * /bin/bash $SCRIPTS_DIR/disk_usage.sh >> /var/log/disk_usage 2>&1") | crontab -
+
+# Set ownership and permissions
+chown -R dbs_admin:dbs_admin /opt/QUT-Log-Forwarder
+chmod -R 700 /opt/QUT-Log-Forwarder
+
+echo "QUT Log Forwarder setup completed successfully."
