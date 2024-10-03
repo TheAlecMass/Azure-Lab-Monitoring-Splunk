@@ -1,0 +1,452 @@
+{
+    "visualizations": {
+        "viz_fAdcD0EG": {
+            "type": "splunk.singlevalue",
+            "showProgressBar": false,
+            "showLastUpdated": false,
+            "title": "Running Virtual Machines",
+            "dataSources": {
+                "primary": "ds_1FY0IJXt"
+            },
+            "options": {
+                "majorColor": "#53a051"
+            }
+        },
+        "viz_1msWyzSi": {
+            "type": "splunk.table",
+            "dataSources": {
+                "primary": "ds_AjlCF5kA"
+            },
+            "title": "Virtual Machine States",
+            "options": {
+                "columnFormat": {
+                    "Time": {
+                        "width": 476
+                    },
+                    "state": {
+                        "width": 206
+                    }
+                }
+            }
+        },
+        "viz_PWc6LRwB": {
+            "type": "splunk.line",
+            "dataSources": {
+                "primary": "ds_zorJAQfH"
+            },
+            "title": "VM Activity 24 hours",
+            "options": {
+                "yAxisTitleText": "Virtual Machine Count",
+                "xAxisTitleText": "Time",
+                "seriesColors": [
+                    "#53a051",
+                    "#009CEB",
+                    "#00CDAF",
+                    "#DD9900",
+                    "#FF677B",
+                    "#CB2196",
+                    "#813193",
+                    "#0051B5",
+                    "#008C80",
+                    "#99B100",
+                    "#FFA476",
+                    "#FF6ACE",
+                    "#AE8CFF",
+                    "#00689D",
+                    "#00490A",
+                    "#465D00",
+                    "#9D6300",
+                    "#F6540B",
+                    "#FF969E",
+                    "#E47BFE"
+                ],
+                "yAxisMajorTickInterval": 1,
+                "yAxisMajorTickSize": 5
+            }
+        },
+        "viz_8AuEO6KM": {
+            "type": "splunk.line",
+            "dataSources": {
+                "primary": "ds_HW9DkRIL"
+            },
+            "title": "Average VM Activity 7 Days",
+            "options": {
+                "yAxisTitleText": "Virtual Machine Count",
+                "yAxisMajorTickInterval": 1,
+                "xAxisTitleText": "Time",
+                "seriesColors": [
+                    "#53a051",
+                    "#0877a6",
+                    "#00CDAF",
+                    "#DD9900",
+                    "#FF677B",
+                    "#CB2196",
+                    "#813193",
+                    "#0051B5",
+                    "#008C80",
+                    "#99B100",
+                    "#FFA476",
+                    "#FF6ACE",
+                    "#AE8CFF",
+                    "#00689D",
+                    "#00490A",
+                    "#465D00",
+                    "#9D6300",
+                    "#F6540B",
+                    "#FF969E",
+                    "#E47BFE"
+                ],
+                "yAxisMajorTickVisibility": "show",
+                "yAxisMajorTickSize": 5
+            }
+        },
+        "viz_MxIQLVTP": {
+            "type": "splunk.singlevalue",
+            "dataSources": {
+                "primary": "ds_EiJCSloj"
+            },
+            "title": "Unique Virtual Machines Started",
+            "options": {
+                "majorColor": "#53a051"
+            }
+        },
+        "viz_oLvRIUzh": {
+            "type": "splunk.singlevalue",
+            "options": {
+                "majorColor": "#dc4e41"
+            },
+            "dataSources": {
+                "primary": "ds_PuAvLW5Y"
+            },
+            "title": "Total Number of Virtual Machines"
+        },
+        "viz_aFbMHtlC": {
+            "type": "splunk.line",
+            "options": {
+                "yAxisMinorTickSize": 5,
+                "xAxisMajorTickSize": 5,
+                "yAxisMajorTickInterval": 1,
+                "yAxisMajorTickSize": 5,
+                "seriesColors": [
+                    "#53a051",
+                    "#0877a6",
+                    "#00CDAF",
+                    "#DD9900",
+                    "#FF677B",
+                    "#CB2196",
+                    "#813193",
+                    "#0051B5",
+                    "#008C80",
+                    "#99B100",
+                    "#FFA476",
+                    "#FF6ACE",
+                    "#AE8CFF",
+                    "#00689D",
+                    "#00490A",
+                    "#465D00",
+                    "#9D6300",
+                    "#F6540B",
+                    "#FF969E",
+                    "#E47BFE"
+                ],
+                "xAxisTitleText": "Time"
+            },
+            "dataSources": {
+                "primary": "ds_p3RU2osJ"
+            },
+            "title": "Average VM Activity 30 Days"
+        }
+    },
+    "dataSources": {
+        "ds_4aCkGeVI": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=service_azure_labs\r\nsourcetype=\"mscs:storage:blob\"\r\nsource=\"$selected_source$\"\r\n| spath path=\"value{}\" output=resourceGroup\r\n| mvexpand resourceGroup\r\n| spath input=resourceGroup path=properties.connectionProfile.privateIpAddress output=private_ip\r\n| spath input=resourceGroup path=properties.state output=state\r\n| spath input=resourceGroup path=properties.timestamp output=timestamp\r\n| eval timestamp=strptime(timestamp, \"%Y-%m-%dT%H:%M:%S.%3NZ\")\r\n| sort 0 - timestamp\r\n| dedup private_ip sortby - timestamp\r\n| search state=\"Stopped\" OR state=\"Stopping\"\r\n| stats count as Stopped_or_Stopping_VMs\r\n",
+                "queryParameters": {
+                    "earliest": "$global_time.earliest$",
+                    "latest": "$global_time.latest$"
+                }
+            },
+            "name": "Stopped VM"
+        },
+        "ds_1FY0IJXt": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {},
+                "query": "index=service_azure_labs\r\nsourcetype = \"mscs:storage:blob\"\r\nsource = \"$selected_source$\"\r\n| spath path=\"value{}.properties.state\" output=vm_state\r\n| spath path=\"value{}.properties.connectionProfile.privateIpAddress\" output=private_ip\r\n| eval timestamp=_time\r\n| sort - timestamp\r\n| dedup private_ip\r\n| search vm_state=\"Running\" OR vm_state=\"Starting\"\r\n| stats count as VM_Count"
+            },
+            "name": "Running VMs"
+        },
+        "ds_AjlCF5kA": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=service_azure_labs\r\nsource = \"$selected_source$\"\r\nsourcetype = \"mscs:storage:blob\"\r\n| spath path=\"value{}.properties.state\" output=state \r\n| spath path=\"value{}.properties.connectionProfile.privateIpAddress\" output=ip \r\n| dedup ip\r\n| table source, ip, state\r\n| sort source",
+                "queryParameters": {
+                    "earliest": "$global_time.earliest$",
+                    "latest": "$global_time.latest$"
+                }
+            },
+            "name": "IP Addresses"
+        },
+        "ds_1COoGYCj_ds_1FY0IJXt": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "rt-1h",
+                    "latest": "rt"
+                },
+                "query": "index=* value{}.properties.state=\"Running\" | stats count as StoppedVMs"
+            },
+            "name": "Running VMs copy 1"
+        },
+        "ds_GkIMfBk9_ds_1FY0IJXt": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "-4h@m",
+                    "latest": "now"
+                },
+                "query": "index=* value{}.properties.state=\"Running\" | stats count as StoppedVMs"
+            },
+            "name": "Running VMs copy 2"
+        },
+        "ds_Sb5ATuXp_ds_4aCkGeVI": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=* | mvexpand value{}.properties.state | search value{}.properties.state=\"Stopped\" | stats count as StoppedVMs\r\n\r\n",
+                "queryParameters": {
+                    "earliest": "-4h@m",
+                    "latest": "now"
+                }
+            },
+            "name": "Stopped VM copy 1"
+        },
+        "ds_urPnwIlp": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=* sourcetype=\"mscs:nsg:flow\"\r\n| eval Time=strftime(_time, \"%m/%d/%y %I:%M:%S %p\")\r\n| spath input=_raw path=records{}.properties.flows{}.flows{}.mac output=mac_address\r\n| rex field=_raw \"\\\"flowTuples\\\":\\[(?<flow_tuples>.+?)\\]\\}\"\r\n| mvexpand flow_tuples\r\n| rex field=flow_tuples \"(?<event_id>\\d+),(?<vm_ip>[^,]+),(?<src_ip>[^,]+),(?<vm_port>\\d+),(?<src_port>\\d+),(?<protocol>[^,]+),(?<traffic_direction>[^,]+),(?<action>[^,]+),(?<flow_state>[^,]+)\"\r\n| eval protocol_full=case(protocol=\"T\", \"TCP\", protocol=\"U\", \"UDP\", protocol=\"I\", \"ICMP\", true(), protocol)\r\n| eval direction_full=case(traffic_direction=\"O\", \"Outbound\", traffic_direction=\"I\", \"Inbound\", true(), traffic_direction)\r\n| eval action_full=case(action=\"A\", \"Allowed\", action=\"D\", \"Denied\", true(), action)\r\n| eval flow_state_full=case(flow_state=\"B\", \"Begin\", flow_state=\"E\", \"End\", flow_state=\"C\", \"Continuing\", true(), flow_state)\r\n| eval temp_vm_ip=if(traffic_direction=\"I\", src_ip, vm_ip),\r\n      temp_src_ip=if(traffic_direction=\"I\", vm_ip, src_ip)\r\n| eval vm_ip=temp_vm_ip,\r\n      src_ip=temp_src_ip\r\n| fields - temp_vm_ip temp_src_ip\r\n| iplocation src_ip\r\n| eval src_country = if(isnull(Country), \"Unknown\", Country)\r\n| stats values(Time) as Time, \r\n        values(mac_address) as mac_addresses, \r\n        values(vm_ip) as vm_ips, \r\n        values(src_ip) as src_ips, \r\n        values(vm_port) as vm_ports, \r\n        values(src_port) as src_ports, \r\n        values(protocol_full) as protocols, \r\n        values(direction_full) as traffic_directions,\r\n        values(action_full) as actions, \r\n        values(flow_state_full) as flow_states, \r\n        values(src_country) as src_countries by event_id\r\n| sort - Time\r\n"
+            },
+            "name": "NSG Flow Events"
+        },
+        "ds_xpcxRB7P_ds_urPnwIlp": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=service_azure_labs\r\n(\r\n    (sourcetype=\"mscs:nsg:flow\") \r\n    OR \r\n    (sourcetype=\"mscs:storage:blob\" AND source=\"$selected_source$\")\r\n)\r\n| spath path=\"value{}.properties.connectionProfile.privateIpAddress\" output=ip\r\n| eval Time=strftime(_time, \"%m/%d/%y %I:%M:%S %p\")\r\n| spath input=_raw path=records{}.properties.flows{}.flows{}.mac output=mac_address\r\n| rex field=_raw \"\\\"flowTuples\\\":\\[(?<flow_tuples>.+?)\\]\\}\"\r\n| mvexpand flow_tuples\r\n| rex field=flow_tuples \"(?<event_id>\\d+),(?<vm_ip>[^,]+),(?<src_ip>[^,]+),(?<vm_port>\\d+),(?<src_port>\\d+),(?<protocol>[^,]+),(?<traffic_direction>[^,]+),(?<action>[^,]+),(?<flow_state>[^,]+)\"\r\n| eval protocol_full=case(protocol=\"T\", \"TCP\", protocol=\"U\", \"UDP\", protocol=\"I\", \"ICMP\", true(), protocol)\r\n| eval direction_full=case(traffic_direction=\"O\", \"Outbound\", traffic_direction=\"I\", \"Inbound\", true(), traffic_direction)\r\n| eval action_full=case(action=\"A\", \"Allowed\", action=\"D\", \"Denied\", true(), action)\r\n| eval flow_state_full=case(flow_state=\"B\", \"Begin\", flow_state=\"E\", \"End\", flow_state=\"C\", \"Continuing\", true(), flow_state)\r\n| eval temp_vm_ip=if(traffic_direction=\"I\", src_ip, vm_ip),\r\n      temp_src_ip=if(traffic_direction=\"I\", vm_ip, src_ip)\r\n| eval vm_ip=temp_vm_ip,\r\n      src_ip=temp_src_ip\r\n| fields - temp_vm_ip temp_src_ip\r\n| iplocation src_ip\r\n| eval src_country = if(isnull(Country), \"Unknown\", Country)\r\n| stats values(Time) as Time, \r\n        values(mac_address) as mac_addresses, \r\n        values(vm_ip) as vm_ips, \r\n        values(src_ip) as src_ips, \r\n        values(vm_port) as vm_ports, \r\n        values(src_port) as src_ports, \r\n        values(protocol_full) as protocols, \r\n        values(direction_full) as traffic_directions,\r\n        values(action_full) as actions, \r\n        values(flow_state_full) as flow_states, \r\n        values(src_country) as src_countries by event_id\r\n| sort - Time\r\n",
+                "queryParameters": {
+                    "earliest": "$global_time.earliest$",
+                    "latest": "$global_time.latest$"
+                }
+            },
+            "name": "NSG Flow Events Scaled"
+        },
+        "ds_Ivyj1mfN": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=* sourcetype=\"mscs:nsg:flow\"\r\n| spath input=_raw path=records{}.properties.flows{}.flows{}.mac output=mac_address\r\n| rex field=_raw \"\\\"flowTuples\\\":\\[(?<flow_tuples>.+?)\\]\\}\"\r\n| mvexpand flow_tuples\r\n| rex field=flow_tuples \"(?<event_id>\\d+),(?<vm_ip>[^,]+),(?<src_ip>[^,]+),(?<vm_port>\\d+),(?<src_port>\\d+),(?<protocol>[^,]+),(?<traffic_direction>[^,]+),(?<access>[^,]+),(?<traffic_status>[^,]+)\"\r\n| eval temp_vm_ip=if(traffic_direction=\"I\", src_ip, vm_ip),\r\n      temp_src_ip=if(traffic_direction=\"I\", vm_ip, src_ip)\r\n| eval vm_ip=temp_vm_ip,\r\n      src_ip=temp_src_ip\r\n| fields - temp_vm_ip temp_src_ip\r\n| iplocation src_ip\r\n| stats values(mac_address) as mac_addresses, values(vm_ip) as vm_ips, values(src_ip) as src_ips, values(vm_port) as vm_ports, values(src_port) as src_ports, values(protocol) as protocols, values(traffic_direction) as traffic_directions, values(access) as access_list, values(traffic_status) as traffic_statuses, values(Country) as countries, values(lat) as latitudes, values(lon) as longitudes by event_id"
+            },
+            "name": "Geolocate"
+        },
+        "ds_imaVQ64V_ds_Ivyj1mfN": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=service_azure_labs sourcetype=\"mscs:nsg:flow\"\r\n| spath input=_raw path=records{}.properties.flows{}.flows{}.mac output=mac_address\r\n| rex field=_raw \"\\\"flowTuples\\\":\\[(?<flow_tuples>.+?)\\]\\}\"\r\n| mvexpand flow_tuples\r\n| rex field=flow_tuples \"(?<event_id>\\d+),(?<vm_ip>[^,]+),(?<src_ip>[^,]+),(?<vm_port>\\d+),(?<src_port>\\d+),(?<protocol>[^,]+),(?<traffic_direction>[^,]+),(?<access>[^,]+),(?<traffic_status>[^,]+)\"\r\n| eval temp_vm_ip=if(traffic_direction=\"I\", src_ip, vm_ip),\r\n      temp_src_ip=if(traffic_direction=\"I\", vm_ip, src_ip)\r\n| eval vm_ip=temp_vm_ip,\r\n      src_ip=temp_src_ip\r\n| fields - temp_vm_ip temp_src_ip\r\n| iplocation src_ip\r\n| search Country!=null AND Country!=\"unknown\" AND lat!=null AND lon!=null\r\n| stats values(src_ip) as src_ips, values(traffic_direction) as traffic_directions, values(Country) as countries, values(lat) as latitudes, values(lon) as longitudes by vm_ip, event_id\r\n",
+                "queryParameters": {
+                    "earliest": "$global_time.earliest$",
+                    "latest": "$global_time.latest$"
+                }
+            },
+            "name": "Geolocate v1.1"
+        },
+        "ds_1JiRwOCp": {
+            "type": "ds.chain",
+            "options": {
+                "query": "index=* sourcetype=mscs:storage:blob earliest=-24h@h latest=now | stats count by source | fields source\r\n"
+            },
+            "name": "Search Labs"
+        },
+        "ds_zorJAQfH": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=service_azure_labs\r\nsourcetype=\"mscs:storage:blob\"\r\nsource=\"$selected_source$\"\r\n| spath path=\"value{}.properties.state\" output=vm_state\r\n| spath path=\"value{}.properties.connectionProfile.privateIpAddress\" output=private_ip\r\n| search vm_state=\"Running\" OR vm_state=\"Starting\" OR vm_state=\"Stopped\" OR vm_state=\"Stopping\"\r\n| eval VM_Count=if(vm_state=\"Running\" OR vm_state=\"Starting\", 1, 0)\r\n| timechart span=5m sum(VM_Count) as VM_Count\r\n| fillnull value=0 VM_Count",
+                "queryParameters": {
+                    "earliest": "-24h@h",
+                    "latest": "now"
+                }
+            },
+            "name": "Line Graph Vms"
+        },
+        "ds_HW9DkRIL": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=service_azure_labs\nsourcetype=\"mscs:storage:blob\"\nsource=\"$selected_source$\"\n| spath path=\"value{}.properties.state\" output=vm_state\n| spath path=\"value{}.properties.connectionProfile.privateIpAddress\" output=private_ip\n| search vm_state=\"Running\" OR vm_state=\"Starting\" OR vm_state=\"Stopped\" OR vm_state=\"Stopping\"\n| eval VM_Count=if(vm_state=\"Running\" OR vm_state=\"Starting\", 1, 0)\n| timechart span=5m sum(VM_Count) as VM_Count\n| fillnull value=0 VM_Count\n| streamstats window=12 avg(VM_Count) as VM_Average\n| fields - VM_Count",
+                "queryParameters": {
+                    "earliest": "-7d@h",
+                    "latest": "now"
+                }
+            },
+            "name": "Line Graph 7 Days"
+        },
+        "ds_EiJCSloj": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=service_azure_labs\r\nsourcetype = \"mscs:storage:blob\"\r\nsource = \"$selected_source$\"\r\n| spath path=\"value{}.properties.state\" output=vm_state\r\n| spath path=\"value{}.properties.connectionProfile.privateIpAddress\" output=private_ip\r\n| search vm_state=\"Running\" OR vm_state=\"Starting\"\r\n| dedup private_ip\r\n| stats count as VMsStarted"
+            },
+            "name": "Unique VMs Started"
+        },
+        "ds_PuAvLW5Y": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=service_azure_labs\r\nsourcetype = \"mscs:storage:blob\"\r\nsource = \"$selected_source$\"\r\n| spath path=\"value{}.properties.connectionProfile.privateIpAddress\" output=private_ip\r\n| dedup private_ip\r\n| stats count(private_ip) as Total_VM_Count\r\n"
+            },
+            "name": "Total Virtual Machines"
+        },
+        "ds_p3RU2osJ": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=service_azure_labs\nsourcetype=\"mscs:storage:blob\"\nsource=\"$selected_source$\"\n| spath path=\"value{}.properties.state\" output=vm_state\n| spath path=\"value{}.properties.connectionProfile.privateIpAddress\" output=private_ip\n| search vm_state=\"Running\" OR vm_state=\"Starting\" OR vm_state=\"Stopped\" OR vm_state=\"Stopping\"\n| eval VM_Count=if(vm_state=\"Running\" OR vm_state=\"Starting\", 1, 0)\n| timechart span=5m sum(VM_Count) as VM_Count\n| fillnull value=0 VM_Count\n| streamstats window=48 avg(VM_Count) as VM_Average\n| fields - VM_Count\n",
+                "queryParameters": {
+                    "earliest": "-30d@d",
+                    "latest": "now"
+                }
+            },
+            "name": "Line Graph 30 days"
+        }
+    },
+    "defaults": {
+        "dataSources": {
+            "ds.search": {
+                "options": {
+                    "queryParameters": {
+                        "latest": "$global_time.latest$",
+                        "earliest": "$global_time.earliest$"
+                    }
+                }
+            }
+        }
+    },
+    "inputs": {
+        "input_global_trp": {
+            "type": "input.timerange",
+            "options": {
+                "token": "global_time",
+                "defaultValue": "-24h@h,now"
+            },
+            "title": "Global Time Range"
+        },
+        "input_M71ZEhS9": {
+            "options": {
+                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
+                "token": "selected_source",
+                "defaultValue": "*"
+            },
+            "title": "Lab Selected",
+            "type": "input.dropdown",
+            "dataSources": {
+                "primary": "ds_1JiRwOCp"
+            },
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": ">statics | formatByType(formattedConfig)",
+                "statics": [
+                    [
+                        "All"
+                    ],
+                    [
+                        "*"
+                    ]
+                ],
+                "label": ">primary | seriesByName(\"source\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "value": ">primary | seriesByName(\"source\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            }
+        }
+    },
+    "layout": {
+        "type": "grid",
+        "options": {
+            "width": 1440,
+            "height": 960
+        },
+        "structure": [
+            {
+                "item": "viz_fAdcD0EG",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 0,
+                    "w": 467,
+                    "h": 133
+                }
+            },
+            {
+                "item": "viz_PWc6LRwB",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 133,
+                    "w": 720,
+                    "h": 461
+                }
+            },
+            {
+                "item": "viz_1msWyzSi",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 594,
+                    "w": 1439,
+                    "h": 408
+                }
+            },
+            {
+                "item": "viz_oLvRIUzh",
+                "type": "block",
+                "position": {
+                    "x": 467,
+                    "y": 0,
+                    "w": 511,
+                    "h": 133
+                }
+            },
+            {
+                "item": "viz_aFbMHtlC",
+                "type": "block",
+                "position": {
+                    "x": 720,
+                    "y": 350,
+                    "w": 719,
+                    "h": 244
+                }
+            },
+            {
+                "item": "viz_8AuEO6KM",
+                "type": "block",
+                "position": {
+                    "x": 720,
+                    "y": 133,
+                    "w": 719,
+                    "h": 217
+                }
+            },
+            {
+                "item": "viz_MxIQLVTP",
+                "type": "block",
+                "position": {
+                    "x": 978,
+                    "y": 0,
+                    "w": 461,
+                    "h": 133
+                }
+            }
+        ],
+        "globalInputs": [
+            "input_global_trp",
+            "input_M71ZEhS9"
+        ]
+    },
+    "description": "Dashboard that monitors QUT Azure Labs Virtual Machines and Filters by class",
+    "title": "QUT-TZZZ-AzureLabs Login v1.6"
+}

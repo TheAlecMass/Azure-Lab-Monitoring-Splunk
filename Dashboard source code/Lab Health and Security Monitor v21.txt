@@ -1,0 +1,497 @@
+{
+    "dataSources": {
+        "ds_AfXb9vDw": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=service_azure_labs (source=\"win-logs-Disk_*\" OR source=\"win-logs-Memory_*\" OR source=\"win-logs-CPU_*\" OR source=\"mem_usage.log_*\" OR source=\"disk_usage.log_*\" OR source=\"cpu_usage.log_*\" OR source=\"network_tp.log_*\" OR source=\"uptime.log_*\")\n| rex field=_raw \"priv_ip_address=(?<priv_ip_address>\\d+\\.\\d+\\.\\d+\\.\\d+)\"\n| rex field=_raw \"pub_ip_address=(?<pub_ip_address>\\d+\\.\\d+\\.\\d+\\.\\d+)\"\n| rex field=_raw \"processortime-_total-Value=(?<processor_time_total>\\d+\\.\\d+)\"\n| rex field=_raw \"freespace-c:-Value=(?<freespace_c_value>\\d+\\.\\d+)\"\n| rex field=_raw \"committedbytesinuse-Value=(?<committedbytesinuse_value>\\d+\\.\\d+)\"\n| rex \"cpu_usage=(?<cpu_usage>[\\d.]+)\"\n| rex field=_raw \"mem_used=(?<mem_used>\\d+)\\s+mem_free=(?<mem_free>\\d+)\"\n| rex field=_raw \"disk_usage=(?<disk_usage>\\d+)\\s+disk_free=(?<disk_free>\\d+)\"\n| rex field=_raw \"uptime=(?<uptime>\\d+)\"\n| eval Percent_Disk_Used=if(match(source, \"win-logs-Disk_.*\"), round((100 - freespace_c_value), 2), Percent_Disk_Used)\n| eval Percent_Memory_Used=if(match(source, \"win-logs-Memory_*\"), round(committedbytesinuse_value, 2), Percent_Memory_Used)\n| eval Percent_Memory_Used=if(match(source, \"mem_usage.log_*\"), round((mem_used / (mem_used + mem_free)) * 100, 2), Percent_Memory_Used)\n| eval Percent_Disk_Used=if(match(source, \"disk_usage.log_*\"), round((disk_usage / (disk_usage + disk_free)) * 100, 2), Percent_Disk_Used)\n| eval Percent_Processor_Time=if(match(source, \"win-logs-CPU_*\"), round(processor_time_total, 2), Percent_Processor_Time)\n| eval Percent_Processor_Time=if(match(source, \"cpu_usage.log_*\"), round(cpu_usage, 2), Percent_Processor_Time)\n| eval Current_Uptime=if(sourcetype==\"WIN:Perfmon:System\" AND counter==\"System Up Time\", round(Value / 3600, 2), Current_Uptime)\n| eval Current_Uptime=if(sourcetype==\"uptime.log\", round(uptime / 3600, 2), Current_Uptime)\n| eval OS_Type=if(match(source, \"win\"), \"Windows\", \"Linux\")\n| where priv_ip_address!=\"priv_ip_address_placeholder\" AND pub_ip_address!=\"pub_ip_address_placeholder\" AND NOT (pub_ip_address=\"Moved\") AND NOT (pub_ip_address=\"upstream\")\n| stats latest(Percent_Memory_Used) as Percent_Memory_Used, latest(Percent_Disk_Used) as Percent_Disk_Used, latest(Percent_Processor_Time) as Percent_Processor_Time, latest(Current_Uptime) as Current_Uptime by priv_ip_address, pub_ip_address, OS_Type\n| table priv_ip_address, pub_ip_address, OS_Type, Percent_Memory_Used, Percent_Disk_Used, Percent_Processor_Time",
+                "queryParameters": {}
+            },
+            "name": "Lab Performance Table"
+        },
+        "ds_fYzZONrF": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=service_azure_labs\r\n| rex field=_raw \"pub_ip_address=(?<pub_ip_address>\\d+\\.\\d+\\.\\d+\\.\\d+)\"\r\n| rex field=_raw \"priv_ip_address=(?<priv_ip_address>\\d+\\.\\d+\\.\\d+\\.\\d+)\"\r\n| where priv_ip_address!=\"priv_ip_address_placeholder\" AND pub_ip_address!=\"pub_ip_address_placeholder\" AND NOT (pub_ip_address=\"Moved\")\r\n| stats dc(priv_ip_address) as Unique_Machine_Count",
+                "enableSmartSources": true,
+                "queryParameters": {}
+            },
+            "name": "Total_Labs"
+        },
+        "ds_RER7WBLl": {
+            "type": "ds.search",
+            "options": {
+                "query": "(index=service_azure_labs (source=\"win-logs-Memory_*\" OR source=\"mem_usage.log_*\"))\r\n| rex field=_raw \"pub_ip_address=(?<pub_ip_address>\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})\"\r\n| rex field=_raw \"priv_ip_address=(?<priv_ip_address>\\d+\\.\\d+\\.\\d+\\.\\d+)\"\r\n| rex field=_raw \"committedbytesinuse-Value=(?<committedbytesinuse_value>\\d+\\.\\d+)\"\r\n| eval Percent_Memory_Used=if(match(source, \"win-logs-Memory_*\"), round(committedbytesinuse_value, 2), Percent_Memory_Used)\r\n| eval OS_Type=if(match(source, \"win-logs-Memory_*\"), \"Windows\", OS_Type)\r\n| fields _time, priv_ip_address, pub_ip_address, Percent_Memory_Used, OS_Type\r\n| where priv_ip_address!=\"priv_ip_address_placeholder\" AND pub_ip_address!=\"pub_ip_address_placeholder\"\r\n\r\n| append\r\n    [ search index=service_azure_labs source=\"mem_usage.log_*\"\r\n    | rex field=_raw \"mem_used=(?<mem_used>\\d+)\\s+mem_free=(?<mem_free>\\d+)\"\r\n    | eval Percent_Memory_Used=round((mem_used / (mem_used + mem_free)) * 100, 2)\r\n    | eval OS_Type=\"Linux\"\r\n    | fields _time, priv_ip_address, pub_ip_address, Percent_Memory_Used, OS_Type\r\n    | where priv_ip_address!=\"priv_ip_address_placeholder\" AND pub_ip_address!=\"pub_ip_address_placeholder\" ]\r\n\r\n| stats latest(Percent_Memory_Used) as Percent_Memory_Used by _time, priv_ip_address, OS_Type\r\n| timechart span=1h avg(Percent_Memory_Used) by OS_Type"
+            },
+            "name": "AVG RAM by OS"
+        },
+        "ds_rRLehNVD": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=service_azure_labs source=\"win-logs-Memory_*\" \r\n| rex field=_raw \"pub_ip_address=(?<pub_ip_address>\\d+\\.\\d+\\.\\d+\\.\\d+)\"\r\n| rex field=_raw \"priv_ip_address=(?<priv_ip_address>\\d+\\.\\d+\\.\\d+\\.\\d+)\"\r\n| rex field=_raw \"counter=(?<counter>[^\\s]+)\"\r\n| eval OS_Type=\"Windows\"\r\n| fields priv_ip_address, pub_ip_address, OS_Type, counter\r\n\r\n| append \r\n    [ search index=service_azure_labs source=\"mem_usage.log_*\"\r\n    | rex field=_raw \"priv_ip_address=(?<priv_ip_address>\\d+\\.\\d+\\.\\d+\\.\\d+)\"\r\n    | rex field=_raw \"pub_ip_address=(?<pub_ip_address>\\d+\\.\\d+\\.\\d+\\.\\d+)\"\r\n    | rex field=_raw \"counter=(?<counter>[^\\s]+)\"\r\n    | eval OS_Type=\"Linux\"\r\n    | fields priv_ip_address, pub_ip_address, OS_Type, counter]\r\n\r\n| where priv_ip_address!=\"priv_ip_address_placeholder\" AND pub_ip_address!=\"pub_ip_address_placeholder\" AND NOT (pub_ip_address=\"Moved\")\r\n| stats dc(priv_ip_address) as Count by OS_Type\r\n"
+            },
+            "name": "Search OS"
+        },
+        "ds_5yUNYaBx": {
+            "type": "ds.search",
+            "options": {
+                "query": "(index=service_azure_labs (source=\"win-logs-Disk_*\" OR source=\"disk_usage.log_*\"))\r\n| rex field=_raw \"pub_ip_address=(?<pub_ip_address>\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})\"\r\n| rex field=_raw \"priv_ip_address=(?<priv_ip_address>\\d+\\.\\d+\\.\\d+\\.\\d+)\"\r\n| rex field=_raw \"freespace-c:-Value=(?<freespace_c_value>\\d+\\.\\d+)\"\r\n| eval Percent_Disk_Used=if(match(source, \"win-logs-Disk_*\"), round(100 - freespace_c_value, 2), Percent_Disk_Used)\r\n| eval OS_Type=if(match(source, \"win-logs-Disk_*\"), \"Windows\", OS_Type)\r\n| fields _time, priv_ip_address, pub_ip_address, Percent_Disk_Used, OS_Type\r\n| where priv_ip_address!=\"priv_ip_address_placeholder\" AND pub_ip_address!=\"pub_ip_address_placeholder\"\r\n\r\n| append\r\n    [ search index=service_azure_labs source=\"disk_usage.log_*\"\r\n    | rex field=_raw \"disk_usage=(?<disk_usage>\\d+)\\s+disk_free=(?<disk_free>\\d+)\"\r\n    | eval Percent_Disk_Used=round((disk_usage / (disk_usage + disk_free)) * 100, 2)\r\n    | eval OS_Type=\"Linux\"\r\n    | fields _time, priv_ip_address, pub_ip_address, Percent_Disk_Used, OS_Type\r\n    | where priv_ip_address!=\"priv_ip_address_placeholder\" AND pub_ip_address!=\"pub_ip_address_placeholder\" ]\r\n\r\n| stats latest(Percent_Disk_Used) as Percent_Disk_Used by _time, priv_ip_address, OS_Type\r\n| timechart span=1h avg(Percent_Disk_Used) by OS_Type"
+            },
+            "name": "AVG Disk Usage by OS"
+        },
+        "ds_16mFQJGq": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=\"service_azure_labs\" sourcetype=\"mscs:storage:blob:json\" source=\"win-logs-Network_*\"\n| rex field=_raw \"priv_ip_address=(?<priv_ip_address>\\d+\\.\\d+\\.\\d+\\.\\d+)\"\n| rex \"bytestotalsec-Value=(?<WIN_bytestotalsec_Value>\\d+\\.\\d+)?\"\n| rex \"bytessentsec-Value=(?<WIN_bytessentsec_Value>\\d+\\.\\d+)?\"\n| rex \"bytesreceivedsec-Value=(?<WIN_bytesreceivedsec_Value>\\d+\\.\\d+)?\"\n| rex \"rx\\s+(?<LTS_rx_kbps>\\d+\\.\\d+)\\s+kbit/s\"\n| rex \"tx\\s+(?<LTS_tx_kbps>\\d+\\.\\d+)\\s+kbit/s\"\n| eval WIN_Kbps_total = if(isnotnull(WIN_bytestotalsec_Value), round((WIN_bytestotalsec_Value * 8) / 1024, 2), null())\n| eval WIN_Kbps_sent = if(isnotnull(WIN_bytessentsec_Value), round((WIN_bytessentsec_Value * 8) / 1024, 2), null())\n| eval WIN_Kbps_received = if(isnotnull(WIN_bytesreceivedsec_Value), round(WIN_bytesreceivedsec_Value / 1024, 2), null())\n| eval label = \"kbps\"\n| timechart span=15m avg(WIN_Kbps_received) as received_kbps, avg(WIN_Kbps_sent) as sent_kbps",
+                "queryParameters": {
+                    "earliest": "$global_time.earliest$",
+                    "latest": "$global_time.latest$"
+                }
+            },
+            "name": "Windows Sent-Received kbps"
+        },
+        "ds_zJWUN35Y_ds_16mFQJGq": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=service_azure_labs (source=\"network_tp.log_*\")\r\n| rex field=_raw \"priv_ip_address=(?<priv_ip_address>\\d+\\.\\d+\\.\\d+\\.\\d+)\"\r\n| rex field=_raw \"rx\\s+(?<rx_kbps>\\d+\\.\\d+)\\s+kbit/s\"\r\n| rex field=_raw \"tx\\s+(?<tx_kbps>\\d+\\.\\d+)\\s+kbit/s\"\r\n| eval KB_Sent_sec = round(rx_kbps, 2) \r\n| eval KB_Received_sec = round(tx_kbps, 2)  \r\n| eval OS_Type=\"Linux\"\r\n| table _time, priv_ip_address, pub_ip_address, KB_Sent_sec, KB_Received_sec, OS_Type\r\n\r\n| stats avg(KB_Sent_sec) as Avg_Sent_KBps, avg(KB_Received_sec) as Avg_Received_KBps by _time\r\n| timechart span=5min avg(Avg_Sent_KBps) as \"Average Sent KBps\", avg(Avg_Received_KBps) as \"Average Received KBps\"\r\n| fields _time, \"Average Sent KBps\", \"Average Received KBps\""
+            },
+            "name": "LTS Sent-Received kbps"
+        },
+        "ds_sMnbpxYW": {
+            "type": "ds.search",
+            "options": {
+                "query": "(index=service_azure_labs (source=\"win-logs-CPU_*\" OR source=\"cpu_usage.log_*\"))\r\n| rex field=_raw \"pub_ip_address=(?<pub_ip_address>\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})\"\r\n| rex field=_raw \"priv_ip_address=(?<priv_ip_address>\\d+\\.\\d+\\.\\d+\\.\\d+)\"\r\n| rex field=_raw \"processortime-_total-Value=(?<processor_time_total>\\d+\\.\\d+)\"\r\n| rex \"cpu_usage=(?<cpu_usage>[\\d.]+)\"\r\n| eval Percent_Processor_Time=if(match(source, \"win-logs-CPU_*\"), round(processor_time_total, 2), round(cpu_usage, 2))\r\n| eval OS_Type=if(match(source, \"win-logs-CPU_*\"), \"Windows\", \"Linux\")\r\n| fields _time, priv_ip_address, pub_ip_address, Percent_Processor_Time, OS_Type\r\n| where priv_ip_address!=\"priv_ip_address_placeholder\" AND pub_ip_address!=\"pub_ip_address_placeholder\"\r\n\r\n| stats latest(Percent_Processor_Time) as Percent_Processor_Time by _time, priv_ip_address, OS_Type\r\n| timechart span=1h avg(Percent_Processor_Time) by OS_Type"
+            },
+            "name": "AVG CPU Usage"
+        }
+    },
+    "visualizations": {
+        "viz_PdL4LwYp": {
+            "type": "splunk.table",
+            "dataSources": {
+                "primary": "ds_AfXb9vDw"
+            },
+            "context": {
+                "ip_addressColumnFormatEditorConfig": {
+                    "string": {
+                        "unitPosition": "after",
+                        "unit": "IPv4"
+                    }
+                },
+                "Percent_Memory_UsedColumnFormatEditorConfig": {
+                    "number": {
+                        "thousandSeparated": false,
+                        "unitPosition": "after",
+                        "unit": "%"
+                    }
+                },
+                "Percent_Disk_UsedColumnFormatEditorConfig": {
+                    "number": {
+                        "thousandSeparated": false,
+                        "unitPosition": "after",
+                        "unit": "%"
+                    }
+                },
+                "Percent_Processor_TimeColumnFormatEditorConfig": {
+                    "number": {
+                        "thousandSeparated": false,
+                        "unitPosition": "before",
+                        "unit": "%"
+                    }
+                },
+                "Percent_Memory_UsedRowColorsEditorConfig": [
+                    {
+                        "value": "#118832",
+                        "to": 20
+                    },
+                    {
+                        "value": "#669922",
+                        "from": 20,
+                        "to": 40
+                    },
+                    {
+                        "value": "#CBA700",
+                        "from": 40,
+                        "to": 60
+                    },
+                    {
+                        "value": "#d97a0d",
+                        "from": 60,
+                        "to": 80
+                    },
+                    {
+                        "value": "#d41f1f",
+                        "from": 80
+                    }
+                ],
+                "Percent_Disk_UsedRowColorsEditorConfig": [
+                    {
+                        "value": "#118832",
+                        "to": 20
+                    },
+                    {
+                        "value": "#669922",
+                        "from": 20,
+                        "to": 40
+                    },
+                    {
+                        "value": "#CBA700",
+                        "from": 40,
+                        "to": 60
+                    },
+                    {
+                        "value": "#D94E17",
+                        "from": 60,
+                        "to": 80
+                    },
+                    {
+                        "value": "#D41F1F",
+                        "from": 80
+                    }
+                ],
+                "Percent_Processor_TimeRowColorsEditorConfig": [
+                    {
+                        "value": "#118832",
+                        "to": 20
+                    },
+                    {
+                        "value": "#669922",
+                        "from": 20,
+                        "to": 40
+                    },
+                    {
+                        "value": "#CBA700",
+                        "from": 40,
+                        "to": 60
+                    },
+                    {
+                        "value": "#D94E17",
+                        "from": 60,
+                        "to": 80
+                    },
+                    {
+                        "value": "#D41F1F",
+                        "from": 80
+                    }
+                ],
+                "priv_ip_addressColumnFormatEditorConfig": {
+                    "string": {
+                        "unitPosition": "centre"
+                    }
+                }
+            },
+            "options": {
+                "columnFormat": {
+                    "Percent_Memory_Used": {
+                        "data": "> table | seriesByName(\"Percent_Memory_Used\") | formatByType(Percent_Memory_UsedColumnFormatEditorConfig)",
+                        "rowColors": "> table | seriesByName('Percent_Memory_Used') | rangeValue(Percent_Memory_UsedRowColorsEditorConfig)",
+                        "width": 509
+                    },
+                    "Percent_Disk_Used": {
+                        "data": "> table | seriesByName(\"Percent_Disk_Used\") | formatByType(Percent_Disk_UsedColumnFormatEditorConfig)",
+                        "rowColors": "> table | seriesByName(\"Percent_Disk_Used\") | rangeValue(Percent_Disk_UsedRowColorsEditorConfig)",
+                        "width": 519
+                    },
+                    "Percent_Processor_Time": {
+                        "data": "> table | seriesByName(\"Percent_Processor_Time\") | formatByType(Percent_Processor_TimeColumnFormatEditorConfig)",
+                        "rowColors": "> table | seriesByName(\"Percent_Processor_Time\") | rangeValue(Percent_Processor_TimeRowColorsEditorConfig)",
+                        "width": 446
+                    },
+                    "priv_ip_address": {
+                        "data": "> table | seriesByName(\"priv_ip_address\") | formatByType(priv_ip_addressColumnFormatEditorConfig)",
+                        "width": 179
+                    },
+                    "OS_Type": {
+                        "width": 162
+                    },
+                    "pub_ip_address": {
+                        "width": 189
+                    }
+                },
+                "backgroundColor": "transparent",
+                "tableFormat": {
+                    "rowBackgroundColors": "> table | seriesByIndex(0) | pick(tableAltRowBackgroundColorsByBackgroundColor)",
+                    "headerBackgroundColor": "> backgroundColor | setColorChannel(tableHeaderBackgroundColorConfig)",
+                    "rowColors": "> rowBackgroundColors | maxContrast(tableRowColorMaxContrast)",
+                    "headerColor": "> headerBackgroundColor | maxContrast(tableRowColorMaxContrast)"
+                },
+                "count": 8,
+                "font": "monospace",
+                "fontSize": "large",
+                "headerVisibility": "fixed"
+            },
+            "title": "Lab Performance",
+            "showProgressBar": false,
+            "showLastUpdated": false,
+            "eventHandlers": [
+                {
+                    "type": "drilldown.linkToDashboard",
+                    "options": {
+                        "app": "search",
+                        "dashboard": "lab_analysis_v13",
+                        "newTab": true,
+                        "tokens": [
+                            {
+                                "token": "lab_ip",
+                                "value": "row.priv_ip_address.value"
+                            },
+                            {
+                                "token": "lab_os",
+                                "value": "row.OS_Type.value"
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        "viz_wr7KyvQk": {
+            "type": "splunk.pie",
+            "title": "Labs by OS",
+            "dataSources": {
+                "primary": "ds_rRLehNVD"
+            },
+            "options": {
+                "labelDisplay": "valuesAndPercentage"
+            }
+        },
+        "viz_K8mIrUv8": {
+            "type": "splunk.singlevalue",
+            "title": "SPL FWDR Monitored Labs",
+            "dataSources": {
+                "primary": "ds_fYzZONrF"
+            },
+            "showProgressBar": true,
+            "showLastUpdated": true
+        },
+        "viz_UM2lzLMq": {
+            "type": "splunk.line",
+            "title": "Lab Average CPU Usage %",
+            "dataSources": {
+                "primary": "ds_sMnbpxYW"
+            },
+            "options": {
+                "y": "> primary | frameBySeriesNames('Linux','Windows')",
+                "nullValueDisplay": "zero",
+                "showSplitSeries": true,
+                "yAxisMin": 0,
+                "yAxisMax": 100,
+                "yAxisLineVisibility": "show",
+                "showY2AxisWithZero": true,
+                "yAxisMajorTickVisibility": "show",
+                "yAxisMinorTickVisibility": "show",
+                "lineWidth": 4,
+                "seriesColorsByField": {
+                    "_time": "#7B56DB"
+                }
+            }
+        },
+        "viz_0lau3L6w": {
+            "type": "splunk.line",
+            "showProgressBar": false,
+            "showLastUpdated": false,
+            "title": "Lab Average Memory Usage %",
+            "dataSources": {
+                "primary": "ds_RER7WBLl"
+            },
+            "options": {
+                "y": "> primary | frameBySeriesNames('Linux','Windows')",
+                "annotationX": "> annotation | seriesByName('priv_ip_address')",
+                "nullValueDisplay": "zero",
+                "yAxisMax": 100,
+                "yAxisMin": 0,
+                "yAxisLineVisibility": "show",
+                "y2": "> primary | frameBySeriesNames('')",
+                "showSplitSeries": true,
+                "seriesColors": [
+                    "#7B56DB",
+                    "#009CEB",
+                    "#00CDAF",
+                    "#f8be34",
+                    "#FF677B",
+                    "#CB2196",
+                    "#813193",
+                    "#0051B5",
+                    "#008C80",
+                    "#99B100",
+                    "#FFA476",
+                    "#FF6ACE",
+                    "#AE8CFF",
+                    "#00689D",
+                    "#00490A",
+                    "#465D00",
+                    "#9D6300",
+                    "#F6540B",
+                    "#FF969E",
+                    "#E47BFE"
+                ],
+                "yAxisMinorTickVisibility": "show",
+                "lineWidth": 4
+            }
+        },
+        "viz_Npbz3DXu": {
+            "type": "splunk.line",
+            "title": "Lab Average Disk Usage %",
+            "dataSources": {
+                "primary": "ds_5yUNYaBx"
+            },
+            "options": {
+                "y": "> primary | frameBySeriesNames('Linux','Windows')",
+                "showSplitSeries": true,
+                "yAxisMinorTickVisibility": "show",
+                "yAxisMin": 0,
+                "yAxisMax": 100,
+                "yAxisLineVisibility": "show",
+                "nullValueDisplay": "zero",
+                "lineWidth": 4
+            }
+        },
+        "viz_f6Ww3krF": {
+            "type": "splunk.line",
+            "title": "WIN Sent/Receive Kbps",
+            "dataSources": {
+                "primary": "ds_16mFQJGq"
+            },
+            "options": {
+                "y": "> primary | frameBySeriesNames('sent_kbps')",
+                "y2": "> primary | frameBySeriesNames('received_kbps')",
+                "showSplitSeries": true,
+                "yAxisLineVisibility": "show",
+                "yAxisMinorTickVisibility": "show",
+                "nullValueDisplay": "zero",
+                "showIndependentYRanges": true,
+                "lineWidth": 4
+            }
+        },
+        "viz_m5QCc8ng": {
+            "type": "splunk.line",
+            "title": "LTS Sent/Receive Kbps",
+            "dataSources": {
+                "primary": "ds_zJWUN35Y_ds_16mFQJGq"
+            },
+            "options": {
+                "y": "> primary | frameBySeriesNames('Average Sent KBps')",
+                "y2": "> primary | frameBySeriesNames('Average Received KBps')",
+                "yAxisLineVisibility": "show",
+                "yAxisMinorTickVisibility": "show",
+                "nullValueDisplay": "zero",
+                "showSplitSeries": true,
+                "lineWidth": 4
+            }
+        }
+    },
+    "inputs": {
+        "input_global_trp": {
+            "type": "input.timerange",
+            "options": {
+                "token": "global_time",
+                "defaultValue": "-24h@h,now"
+            },
+            "title": "Global Time Range"
+        }
+    },
+    "layout": {
+        "type": "grid",
+        "options": {
+            "width": 1440,
+            "height": 960
+        },
+        "structure": [
+            {
+                "item": "viz_K8mIrUv8",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 0,
+                    "w": 721,
+                    "h": 205
+                }
+            },
+            {
+                "item": "viz_PdL4LwYp",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 205,
+                    "w": 1438,
+                    "h": 247
+                }
+            },
+            {
+                "item": "viz_UM2lzLMq",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 452,
+                    "w": 455,
+                    "h": 456
+                }
+            },
+            {
+                "item": "viz_m5QCc8ng",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 908,
+                    "w": 720,
+                    "h": 439
+                }
+            },
+            {
+                "item": "viz_0lau3L6w",
+                "type": "block",
+                "position": {
+                    "x": 455,
+                    "y": 452,
+                    "w": 521,
+                    "h": 456
+                }
+            },
+            {
+                "item": "viz_f6Ww3krF",
+                "type": "block",
+                "position": {
+                    "x": 720,
+                    "y": 908,
+                    "w": 718,
+                    "h": 439
+                }
+            },
+            {
+                "item": "viz_wr7KyvQk",
+                "type": "block",
+                "position": {
+                    "x": 721,
+                    "y": 0,
+                    "w": 717,
+                    "h": 205
+                }
+            },
+            {
+                "item": "viz_Npbz3DXu",
+                "type": "block",
+                "position": {
+                    "x": 976,
+                    "y": 452,
+                    "w": 462,
+                    "h": 456
+                }
+            }
+        ],
+        "globalInputs": [
+            "input_global_trp"
+        ]
+    },
+    "title": "Lab Health & Security Monitor v2.1",
+    "defaults": {
+        "dataSources": {
+            "ds.search": {
+                "options": {
+                    "queryParameters": {
+                        "latest": "$global_time.latest$",
+                        "earliest": "$global_time.earliest$"
+                    }
+                }
+            }
+        }
+    },
+    "description": ""
+}
