@@ -20,7 +20,7 @@ The purpose of this repository is to document my own contributions to this proje
 ### Setup Instructions
 1. **Install Splunk Universal Forwarder on Azure VMs:**
    - Run the `get-WIN-SPL-UF.ps1` script on Windows VMs.
-   - For Linux VMs, use the `generate-ip-scripts.sh` and `lab-spl-config-QA.sh` scripts.
+   - For Linux VMs, run the 'setup_qut_log_forwarder.sh.txt' script.
    
 2. **Log Ingestion**:
    - Ensure the following logs are being ingested:
