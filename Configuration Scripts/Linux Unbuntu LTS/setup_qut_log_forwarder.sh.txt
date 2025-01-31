@@ -1,3 +1,43 @@
+# =============================================================================
+# QUT Log Forwarder Setup Script (Linux)
+# Creation Date: 01/05/24
+# Author: Alec Mass
+#
+# Version: 1
+#
+# Description:
+# This Bash script sets up the QUT Log Forwarder on a Linux lab. It configures 
+# log monitoring, schedules data collection, and uploads logs to Azure Storage. 
+# The script installs necessary dependencies, manages cron jobs, and ensures secure 
+# permissions for the log forwarder.
+#
+# Functionality:
+# - Creates necessary directories for scripts and scheduling.
+# - Prompts the user to enter an Azure SAS token for secure uploads.
+# - Configures log monitoring by appending private and public IP addresses to logs.
+# - Downloads and installs AzCopy for Azure Storage uploads.
+# - Defines log collection scripts for CPU, memory, disk, network, and system uptime.
+# - Automates log uploads using cron jobs scheduled every 5 to 15 minutes.
+# - Ensures directory ownership and permissions are restricted to `dbs_admin`.
+#
+# Key Components:
+# - `append_ip_to_logs.sh`: Adds private and public IP information to logs.
+# - `upload_var_logs.sh`: Uploads logs to Azure Storage using AzCopy.
+# - `cpu_usage.sh`, `disk_usage.sh`, `mem_usage.sh`, `network_tp.sh`, `uptime.sh`: 
+#   Scripts for collecting system performance data.
+# - `wget` & `tar`: Downloads and extracts AzCopy for file transfers.
+# - `crontab`: Automates periodic execution of logging and upload tasks.
+#
+# Notes:
+# - The script must be executed with root privileges.
+# - Requires internet access to download AzCopy and fetch the public IP.
+# - The Azure SAS token must have the correct permissions for uploading logs.
+# - The system should have `vnstat` installed for network traffic monitoring.
+# - Logs are stored in `/var/log` and uploaded from `/opt/QUT-Log-Forwarder/logs/`.
+#
+# =============================================================================
+
+
 #!/bin/bash
 
 # Set up directories
