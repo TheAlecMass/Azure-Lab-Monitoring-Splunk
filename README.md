@@ -36,6 +36,10 @@ The purpose of this repository is to document my own contributions to this proje
      - Session times exceeding thresholds.
      - Resource usage alerts (memory, disk, CPU).
 
+### Dashboards
+**Lab Analysis Dashboard**
+![Lab Analysis Dashboard](https://github.com/user-attachments/assets/24de02b7-1d4b-4485-956d-6ec21ca44880)
+
 ### Possible Future Enhancements
 - Full migration to QUT Splunk Cloud.
 - Additional alerts for network throughput monitoring.
