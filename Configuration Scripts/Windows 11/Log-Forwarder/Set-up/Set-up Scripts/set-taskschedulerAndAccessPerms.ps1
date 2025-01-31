@@ -1,4 +1,43 @@
-﻿# Define the folder path
+# =============================================================================
+# QUT Log Forwarder Scheduled Task Setup Script
+# Creation Date: 01/05/24
+# Author: Alec Mass
+#
+# Version: 1
+#
+# Description:
+# This PowerShell script configures file system permissions and sets up 
+# scheduled tasks for the QUT Log Forwarder. It ensures secure access 
+# to log files and automates key processes, such as log uploads and IP address 
+# updates, using Windows Task Scheduler.
+#
+# Functionality:
+# - Restricts folder permissions to `DBS-Admin` for security.
+# - Creates and configures the following scheduled tasks:
+#   - `UploadSyslog`: Runs `push-logs-to-SA.ps1` to upload logs to Azure.
+#   - `ReplacePrivIP`: Updates private IP placeholders in log files.
+#   - `ReplacePubIP`: Updates public IP placeholders in log files.
+#   - `DeletePlaceholderLogs`: Removes outdated placeholder log files.
+# - Ensures scheduled tasks run at system startup and every 5 minutes.
+# - Removes any previously configured versions of the tasks before reinstallation.
+#
+# Key Components:
+# - `Set-Acl`: Restricts folder permissions to `DBS-Admin`.
+# - `New-ScheduledTaskTrigger`: Defines triggers for task execution.
+# - `New-ScheduledTaskAction`: Specifies the scripts to execute.
+# - `New-ScheduledTaskPrincipal`: Ensures tasks run with appropriate privileges.
+# - `Register-ScheduledTask`: Registers and configures the scheduled tasks.
+#
+# Notes:
+# - The script must be executed with administrative privileges.
+# - PowerShell execution policy should be set to `RemoteSigned`.
+# - The log forwarder directory must exist at `C:\Program Files\QUT-Log-Forwarder\`.
+# - Scheduled tasks are configured to run with `DBS-Admin` user permissions.
+#
+# =============================================================================
+
+ 
+# Define the folder path
 $folderPath = "C:\Program Files\QUT-Log-Forwarder"
 
 # Remove all existing permissions
