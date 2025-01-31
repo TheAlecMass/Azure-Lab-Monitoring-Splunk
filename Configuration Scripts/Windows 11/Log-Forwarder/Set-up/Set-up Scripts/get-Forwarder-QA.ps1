@@ -1,4 +1,41 @@
-﻿# Define the paths and filenames
+# =============================================================================
+# QUT Log Forwarder Quality Assurance Script
+# Creation Date: 01/05/24
+# Author: Alec Mass
+#
+# Version: 1
+#
+# Description:
+# This PowerShell script performs quality assurance (QA) checks on the 
+# QUT Log Forwarder configuration. It validates extracted values, scheduled 
+# tasks, AzCopy installation, and directory permissions to ensure proper setup.
+#
+# Functionality:
+# - Extracts and verifies the private IP, public IP, and Azure SAS token 
+#   from the log forwarder script.
+# - Checks for the existence of the AzCopy executable.
+# - Validates that required scheduled tasks (`UploadSyslog`, `ReplacePrivIP`, 
+#   `ReplacePubIP`, `DeletePlaceholderLogs`) are correctly configured.
+# - Ensures that directory permissions restrict access to `DBS-Admin` only.
+# - Provides success or failure messages based on the configuration status.
+#
+# Key Components:
+# - `Extract-Value`: Uses regex to retrieve key values from the script.
+# - `Test-Path`: Checks for the presence of AzCopy.
+# - `Get-ScheduledTask`: Confirms scheduled tasks exist and are correctly set up.
+# - `Get-Acl`: Validates directory permissions to restrict access.
+# - Final status message indicating success or configuration errors.
+#
+# Notes:
+# - Ensure the log forwarder script is correctly configured before running QA.
+# - The Azure SAS token must be correctly set with required permissions.
+# - The script must be executed with administrative privileges.
+# - PowerShell execution policy should be set to `RemoteSigned`.
+#
+# =============================================================================
+
+ 
+ # Define the paths and filenames
 $filePath = "C:\Program Files\QUT-Log-Forwarder\Scheduler\push-logs-to-SA.ps1"
 $azCopyPath = "C:\Program Files\QUT-Log-Forwarder\Scheduler\azcopy.exe"
 $UploadSyslog = "UploadSyslog"
