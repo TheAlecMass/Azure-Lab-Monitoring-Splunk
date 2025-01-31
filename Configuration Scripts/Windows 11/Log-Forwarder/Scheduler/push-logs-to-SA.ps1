@@ -1,3 +1,40 @@
+# =============================================================================
+# QUT Log Forwarder Script
+# Creation Date: 01/05/24
+# Author: Alec Mass
+#
+# Version: 1
+#
+# Description:
+# This PowerShell script collects system performance data from a Windows server,
+# logs the data, and uploads the logs to Azure Storage. It prevents multiple
+# script executions via a file-based locking mechanism.
+#
+# Functionality:
+# - Collects CPU, Memory, Disk, System, and Network performance data using 
+#   Windows Performance Monitor (Perfmon).
+# - Logs collected data into structured log files, categorizing them by metric.
+# - Implements a lock mechanism to prevent concurrent script execution.
+# - Uses AzCopy to upload log files to Azure Storage.
+# - Maintains separate archive logs for historical data.
+#
+# Key Components:
+# - `Write-Log`: Logs script activity for debugging.
+# - `Acquire-Lock` / `Release-Lock`: Ensures only one script instance runs.
+# - `Get-CPUData`, `Get-MemoryData`, `Get-DiskData`, `Get-SystemData`, `Get-NetworkData`:
+#   Functions that retrieve performance metrics.
+# - `Log-Data`: Processes and writes collected data to log files.
+# - `AzCopy Upload`: Transfers logs to Azure Storage for centralized monitoring.
+#
+# Notes:
+# - Uses placeholders for `pub_ip_address`, `priv_ip_address`, and 
+#   `SAS_token_placeholder` to be replaced when 'replace-priv-ip-placeholders.ps1' and
+#   'replace-pub-ip-placeholders.ps1' scripts are run
+# - Ensure AzCopy is installed at `C:\Program Files\QUT-Log-Forwarder\Scheduler\`.
+# - Requires PowerShell execution policy set to `RemoteSigned`.
+#
+# =============================================================================
+
 Set-ExecutionPolicy RemoteSigned -Scope Process -Force
 
 $basePath = "C:\Program Files\QUT-Log-Forwarder\Logs"
